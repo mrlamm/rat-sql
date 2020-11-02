@@ -100,6 +100,7 @@ class Trainer:
             self.model = registry.construct('model', config['model'],
                                             unused_keys=('encoder_preproc', 'decoder_preproc'),
                                             preproc=self.model_preproc, device=self.device)
+
             self.model.to(self.device)
 
     def train(self, config, modeldir):
@@ -149,6 +150,29 @@ class Trainer:
         # 3. Get training data somewhere
         with self.data_random:
             train_data = self.model_preproc.dataset('train')
+
+            if isinstance(self.model.decoder, models.head_corner.decoder.HeadCornerDecoder):
+
+                #  put this under an if satement that checks the model type
+                enc_train, decoder_train = zip(*train_data)
+                # elem = decoder_train[7].tree
+
+                o_seqs = []
+                for i, elem in enumerate(decoder_train[:100]):
+                    oracle_action_sequence = []
+                    elem = elem.tree
+                    self.model.decoder.construct_oracle_sequence((None, elem), oracle_action_sequence, None)
+                    # for saving ## o_seqs.append((elem, [e.__dict__() for e in oracle_action_sequence]))
+                    o_seqs.append(oracle_action_sequence)
+
+                train_data = list(zip(enc_train[:100], zip(decoder_train, o_seqs)))
+
+                # json.dump(o_seqs, open("data/spider/oracle_seqs_first_100.json", 'w'))
+                # self.model.decoder.construct_oracle_sequence((None, elem), oracle_action_sequence, None)
+
+                # json.dump([elem.tree for elem in decoder_train][:10], open("data/spider/train_samples.json", 'w'))
+                # json.dump()
+
             train_data_loader = self._yield_batches_from_epochs(
                 torch.utils.data.DataLoader(
                     train_data,
@@ -156,6 +180,7 @@ class Trainer:
                     shuffle=True,
                     drop_last=True,
                     collate_fn=lambda x: x))
+
         train_eval_data_loader = torch.utils.data.DataLoader(
             train_data,
             batch_size=self.train_config.eval_batch_size,
@@ -188,6 +213,8 @@ class Trainer:
                     for _i in range(self.train_config.num_batch_accumulated):
                         if _i > 0:  batch = next(train_data_loader)
                         loss = self.model.compute_loss(batch)
+                        import sys
+                        sys.exit()
                         norm_loss = loss / self.train_config.num_batch_accumulated
                         norm_loss.backward()
 

@@ -1,0 +1,78 @@
+product_types,"col_unit -> agg_type/agg_id, column/col_id, singleton/is_distinct",2
+product_types,"order_by -> order/order, val_unit*/val_units",2
+product_types,"select -> singleton/is_distinct, agg*/aggs",2
+product_types,"from -> table_unit*/table_units, cond/conds",1
+product_types,"sql -> select/select, cond/where, col_unit*/group_by, order_by/order_by, cond/having, singleton/limit, sql/intersect, sql/except, sql/union, from/from",1
+product_types,"agg -> agg_type/agg_id, val_unit/val_unit",2
+sum_types,val -> Number/NULL,1
+sum_types,val -> String/NULL,1
+sum_types,val -> ValSql/NULL,1
+sum_types,val -> ColUnit/NULL,1
+sum_types,val -> Terminal/NULL,1
+sum_types,val_unit -> Column/NULL,1
+sum_types,val_unit -> Minus/NULL,1
+sum_types,val_unit -> Plus/NULL,1
+sum_types,val_unit -> Times/NULL,1
+sum_types,val_unit -> Divide/NULL,1
+sum_types,table_unit -> TableUnitSql/NULL,1
+sum_types,table_unit -> Table/NULL,1
+sum_types,cond -> And/NULL,1
+sum_types,cond -> Or/NULL,1
+sum_types,cond -> Not/NULL,1
+sum_types,cond -> Between/NULL,1
+sum_types,cond -> Eq/NULL,1
+sum_types,cond -> Gt/NULL,1
+sum_types,cond -> Lt/NULL,1
+sum_types,cond -> Ge/NULL,1
+sum_types,cond -> Le/NULL,1
+sum_types,cond -> Ne/NULL,1
+sum_types,cond -> In/NULL,1
+sum_types,cond -> Like/NULL,1
+sum_types,agg_type -> NoneAggOp/NULL,1
+sum_types,agg_type -> Max/NULL,1
+sum_types,agg_type -> Min/NULL,1
+sum_types,agg_type -> Count/NULL,1
+sum_types,agg_type -> Sum/NULL,1
+sum_types,agg_type -> Avg/NULL,1
+sum_types,order -> Asc/NULL,1
+sum_types,order -> Desc/NULL,1
+primitive_types,identifier,1
+primitive_types,table,1
+primitive_types,column,1
+primitive_types,singleton,1
+primitive_types,bytes,1
+primitive_types,string,1
+primitive_types,int,1
+primitive_types,object,1
+constructors,Number -> object/f,1
+constructors,String -> string/s,1
+constructors,ValSql -> sql/s,1
+constructors,ColUnit -> col_unit/c,1
+constructors,Terminal ->,1
+constructors,Column -> col_unit/col_unit1,1
+constructors,"Minus -> col_unit/col_unit1, col_unit/col_unit2",1
+constructors,"Plus -> col_unit/col_unit1, col_unit/col_unit2",1
+constructors,"Times -> col_unit/col_unit1, col_unit/col_unit2",1
+constructors,"Divide -> col_unit/col_unit1, col_unit/col_unit2",1
+constructors,TableUnitSql -> sql/s,1
+constructors,Table -> table/table_id,1
+constructors,"And -> cond/left, cond/right",1
+constructors,"Or -> cond/left, cond/right",1
+constructors,Not -> cond/c,1
+constructors,"Between -> val_unit/val_unit, val/val1, val/val2",1
+constructors,"Eq -> val_unit/val_unit, val/val1",1
+constructors,"Gt -> val_unit/val_unit, val/val1",1
+constructors,"Lt -> val_unit/val_unit, val/val1",1
+constructors,"Ge -> val_unit/val_unit, val/val1",1
+constructors,"Le -> val_unit/val_unit, val/val1",1
+constructors,"Ne -> val_unit/val_unit, val/val1",1
+constructors,"In -> val_unit/val_unit, val/val1",1
+constructors,"Like -> val_unit/val_unit, val/val1",1
+constructors,NoneAggOp ->,1
+constructors,Max ->,1
+constructors,Min ->,1
+constructors,Count ->,1
+constructors,Sum ->,1
+constructors,Avg ->,1
+constructors,Asc ->,1
+constructors,Desc ->,1

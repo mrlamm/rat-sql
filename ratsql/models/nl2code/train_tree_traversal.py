@@ -60,6 +60,8 @@ class TrainTreeTraversal(TreeTraversal):
 
     def rule_choice(self, node_type, rule_logits):
         self.choice_point = self.XentChoicePoint(rule_logits)
+        # print('train_tree_traversal.rule_choice')
+        # print('setting choicepoint to XentChoicePoint')
         if self.debug:
             choices = []
             probs = []
@@ -75,16 +77,18 @@ class TrainTreeTraversal(TreeTraversal):
 
     def token_choice(self, output, gen_logodds):
         self.choice_point = self.TokenChoicePoint(output, gen_logodds)
+        # print('setting choicepoint to TokenChoicePoint')
     
     def pointer_choice(self, node_type, logits, attention_logits):
         self.choice_point = self.XentChoicePoint(logits)
         self.attention_choice = self.XentChoicePoint(attention_logits)
+        # print('setting choicepoint to XentChoicePoint')
 
     def update_using_last_choice(self, last_choice, extra_choice_info, attention_offset):
         super().update_using_last_choice(last_choice, extra_choice_info, attention_offset)
         if last_choice is None:
             return
-
+        # here
         if self.debug and isinstance(self.choice_point, self.XentChoicePoint):
             valid_choice_indices = [last_choice] + ([] if extra_choice_info is None
                 else extra_choice_info)
@@ -92,6 +96,8 @@ class TrainTreeTraversal(TreeTraversal):
                 self.model.preproc.all_rules[rule_idx][1]
                 for rule_idx in valid_choice_indices]
 
+        # print("train_tree_traversal.update_using_last_choice")
+        # print("computing new loss using last choice")
         self.loss = self.loss.append(
                 self.choice_point.compute_loss(self, last_choice, extra_choice_info))
         

@@ -565,22 +565,28 @@ class NL2CodeDecoder(torch.nn.Module):
 
     def compute_mle_loss(self, enc_input, example, desc_enc, debug=False):
         traversal = TrainTreeTraversal(self, desc_enc, debug)
+        # print('stepping traversal with None')
         traversal.step(None)
         queue = [
             TreeState(
                 node=example.tree,
                 parent_field_type=self.preproc.grammar.root_type,
             )
-        ]
+        ]  # here
+        print(example.tree)
         while queue:
             item = queue.pop()
             node = item.node
             parent_field_type = item.parent_field_type
+            # print("compute_mle_loss")
+            # print("node", node)
 
             if isinstance(node, (list, tuple)):
+                # print("node is list type")
                 node_type = parent_field_type + '*'
                 rule = (node_type, len(node))
                 rule_idx = self.rules_index[rule]
+                print("rule", rule)
                 assert traversal.cur_item.state == TreeTraversal.State.LIST_LENGTH_APPLY
                 traversal.step(rule_idx)
 
@@ -596,11 +602,13 @@ class NL2CodeDecoder(torch.nn.Module):
                 continue
 
             if parent_field_type in self.preproc.grammar.pointers:
+                # print("parent field type in pointers")
                 assert isinstance(node, int)
                 assert traversal.cur_item.state == TreeTraversal.State.POINTER_APPLY
                 pointer_map = desc_enc.pointer_maps.get(parent_field_type)
                 if pointer_map:
                     values = pointer_map[node]
+                    print("pointer", values)
                     if self.sup_att == '1h':
                         if len(pointer_map) == len(enc_input['columns']):
                             if self.attn_type != 'sep':
@@ -616,15 +624,18 @@ class NL2CodeDecoder(torch.nn.Module):
                     else:
                         traversal.step(values[0], values[1:])
                 else:
+                    print("pointer", node)
                     traversal.step(node)
                 continue
 
             if parent_field_type in self.ast_wrapper.primitive_types:
+                # print("parent field type in primitive types")
                 # identifier, int, string, bytes, object, singleton
                 # - could be bytes, str, int, float, bool, NoneType
                 # - terminal tokens vocabulary is created by turning everything into a string (with `str`)
                 # - at decoding time, cast back to str/int/float/bool
                 field_type = type(node).__name__
+                print("primitive", node)
                 field_value_split = self.preproc.grammar.tokenize_field_value(node) + [
                     vocab.EOS]
 
@@ -636,8 +647,10 @@ class NL2CodeDecoder(torch.nn.Module):
             type_info = self.ast_wrapper.singular_types[node['_type']]
 
             if parent_field_type in self.preproc.sum_type_constructors:
+                # print("parent_field_type in preproc.sum_type_constructors")
                 # ApplyRule, like expr -> Call
                 rule = (parent_field_type, type_info.name)
+                print("rule", rule)
                 rule_idx = self.rules_index[rule]
                 assert traversal.cur_item.state == TreeTraversal.State.SUM_TYPE_APPLY
                 extra_rules = [
@@ -646,11 +659,14 @@ class NL2CodeDecoder(torch.nn.Module):
                 traversal.step(rule_idx, extra_rules)
 
             if type_info.fields:
+                # print("type_info.fields == True")
                 # ApplyRule, like Call -> expr[func] expr*[args] keyword*[keywords]
                 # Figure out which rule needs to be applied
                 present = get_field_presence_info(self.ast_wrapper, node, type_info.fields)
                 rule = (node['_type'], tuple(present))
+                print("rule", rule)
                 rule_idx = self.rules_index[rule]
+                # print("rule idx", rule_idx)
                 assert traversal.cur_item.state == TreeTraversal.State.CHILDREN_APPLY
                 traversal.step(rule_idx)
 
@@ -658,7 +674,8 @@ class NL2CodeDecoder(torch.nn.Module):
             for field_info in reversed(type_info.fields):
                 if field_info.name not in node:
                     continue
-
+                # print("appending field to queue")
+                # print("field_info.name", field_info.name)
                 queue.append(
                     TreeState(
                         node=node[field_info.name],
@@ -734,6 +751,7 @@ class NL2CodeDecoder(torch.nn.Module):
             node_type, prev_state, prev_action_emb, parent_h, parent_action_emb, desc_enc)
         # output shape: batch (=1) x emb_size
         output = new_state[0]
+        # print("apply_rule using node_type, prev_state, prev_action_emb , parent_h, parent_action_emb...")
         # rule_logits shape: batch (=1) x num choices
         rule_logits = self.rule_logits(output)
 

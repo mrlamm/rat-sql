@@ -66,3 +66,32 @@ def compute_pointer_with_align(
     pointer_probs = pointer_probs.clamp(min=1e-9)
     pointer_logits = torch.log(pointer_probs)
     return output, new_state, pointer_logits, attention_weights
+
+def compute_pointer_with_align_head_corner(model,
+                                           node_type,
+                                           prev_state,
+                                           prev_action_emb,
+                                           prec_h,
+                                           prec_action_emb,
+                                           goal_h,
+                                           desc_enc):
+    # similar to above, but reflecting head corner order, and including goal state
+    new_state, attention_weights = model._update_state(
+        node_type, prev_state, prev_action_emb, prec_h,
+        prec_action_emb, goal_h, desc_enc)
+    # output shape: batch (=1) x emb_size
+    output = new_state[0]
+    memory_pointer_logits = model.pointers[node_type](
+        output, desc_enc.memory)
+    memory_pointer_probs = torch.nn.functional.softmax(
+        memory_pointer_logits, dim=1)
+    # pointer_logits shape: batch (=1) x num choices
+    if node_type == "column":
+        pointer_probs = torch.mm(memory_pointer_probs, desc_enc.m2c_align_mat)
+    else:
+        assert node_type == "table"
+        pointer_probs = torch.mm(memory_pointer_probs, desc_enc.m2t_align_mat)
+    pointer_probs = pointer_probs.clamp(min=1e-9)
+    pointer_logits = torch.log(pointer_probs)
+
+    return output, new_state, pointer_logits, attention_weights
