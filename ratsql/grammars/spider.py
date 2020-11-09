@@ -67,8 +67,13 @@ class SpiderLanguage:
             asdl_file = "Spider_f1.asdl"
         elif self.factorize_sketch == 2:
             asdl_file = "Spider_f2.asdl"
+        elif self.factorize_sketch == 3:
+            asdl_file = "Spider_f3.asdl"
+        elif self.factorize_sketch == 4:
+            asdl_file = "Spider_f4.asdl"
         else:
             raise NotImplementedError
+
         self.ast_wrapper = ast_util.ASTWrapper(
             asdl.parse(
                 os.path.join(
@@ -308,6 +313,59 @@ class SpiderLanguage:
                     'union': self.parse_sql(sql['union'], optional=True),
                 })
             })
+        elif self.factorize_sketch == 3:
+            return filter_nones({
+                '_type': 'sql',
+                'select': self.parse_select(sql['select']),
+                **({
+                       'from': self.parse_from(sql['from'], self.infer_from_conditions),
+                   } if self.output_from else {}),
+                "where": self.parse_cond(sql['where'], optional=True),
+                "sql_groupby": filter_nones({
+                    '_type': 'sql_groupby',
+                    'group_by': [self.parse_col_unit(u) for u in sql['groupBy']],
+                    'having': self.parse_cond(sql['having'], optional=True),
+                }),
+                "sql_orderby": filter_nones({
+                    '_type': 'sql_orderby',
+                    'order_by': self.parse_order_by(sql['orderBy']),
+                    'limit': sql['limit'] if self.include_literals else (sql['limit'] is not None),
+                }),
+                'sql_ieu': filter_nones({
+                    '_type': 'sql_ieu',
+                    'intersect': self.parse_sql(sql['intersect'], optional=True),
+                    'except': self.parse_sql(sql['except'], optional=True),
+                    'union': self.parse_sql(sql['union'], optional=True),
+                })
+            })
+
+        elif self.factorize_sketch == 4:
+            return filter_nones({
+                '_type': 'sql',
+                'select': self.parse_select(sql['select']),
+                **({
+                       'from': self.parse_from(sql['from'], self.infer_from_conditions),
+                   } if self.output_from else {}),
+                "where": self.parse_cond(sql['where'], optional=True),
+                "sql_groupby": filter_nones({
+                    '_type': 'sql_groupby',
+                    'group_by': [self.parse_col_unit(u) for u in sql['groupBy']],
+                    'having': self.parse_cond(sql['having'], optional=True),
+                }),
+                "sql_orderby": filter_nones({
+                    '_type': 'sql_orderby',
+                    'order_by': self.parse_order_by(sql['orderBy']),
+                    'limit': sql['limit'] if self.include_literals else (sql['limit'] is not None),
+                }),
+                'sql_ieu': filter_nones({
+                    '_type': 'sql_ieu',
+                    'intersect': self.parse_sql(sql['intersect'], optional=True),
+                    'except': self.parse_sql(sql['except'], optional=True),
+                    'union': self.parse_sql(sql['union'], optional=True),
+                })
+            })
+
+
 
     def parse_select(self, select):
         is_distinct, aggs = select

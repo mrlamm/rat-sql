@@ -150,24 +150,36 @@ class Trainer:
         # 3. Get training data somewhere
         with self.data_random:
             train_data = self.model_preproc.dataset('train')
-
+            val_data = self.model_preproc.dataset('val')
             if isinstance(self.model.decoder, models.head_corner.decoder.HeadCornerDecoder):
 
-                #  put this under an if satement that checks the model type
                 enc_train, decoder_train = zip(*train_data)
                 # elem = decoder_train[7].tree
 
                 o_seqs = []
-                for i, elem in enumerate(decoder_train[:100]):
+                to_save = []
+                for i, elem in enumerate(decoder_train):
                     oracle_action_sequence = []
                     elem = elem.tree
                     self.model.decoder.construct_oracle_sequence((None, elem), oracle_action_sequence, None)
-                    # for saving ## o_seqs.append((elem, [e.__dict__() for e in oracle_action_sequence]))
+                    to_save.append((elem, [e.__dict__() for e in oracle_action_sequence]))
                     o_seqs.append(oracle_action_sequence)
 
-                train_data = list(zip(enc_train[:100], zip(decoder_train, o_seqs)))
+                train_data = list(zip(enc_train, zip(decoder_train, o_seqs)))
+                ## json.dump(to_save, open("data/spider/oracle_seqs_all.json", 'w'))
 
-                # json.dump(o_seqs, open("data/spider/oracle_seqs_first_100.json", 'w'))
+                #  put this under an if satement that checks the model type
+                enc_val, decoder_val = zip(*val_data)
+                o_seqs = []
+                for i, elem in enumerate(decoder_val[:10]):
+                    oracle_action_sequence = []
+                    elem = elem.tree
+                    self.model.decoder.construct_oracle_sequence((None, elem), oracle_action_sequence, None)
+                    to_save.append((elem, [e.__dict__() for e in oracle_action_sequence]))
+                    o_seqs.append(oracle_action_sequence)
+
+                val_data = list(zip(enc_val[:10], zip(decoder_val, o_seqs)))
+
                 # self.model.decoder.construct_oracle_sequence((None, elem), oracle_action_sequence, None)
 
                 # json.dump([elem.tree for elem in decoder_train][:10], open("data/spider/train_samples.json", 'w'))
@@ -186,7 +198,6 @@ class Trainer:
             batch_size=self.train_config.eval_batch_size,
             collate_fn=lambda x: x)
 
-        val_data = self.model_preproc.dataset('val')
         val_data_loader = torch.utils.data.DataLoader(
             val_data,
             batch_size=self.train_config.eval_batch_size,
@@ -213,8 +224,6 @@ class Trainer:
                     for _i in range(self.train_config.num_batch_accumulated):
                         if _i > 0:  batch = next(train_data_loader)
                         loss = self.model.compute_loss(batch)
-                        import sys
-                        sys.exit()
                         norm_loss = loss / self.train_config.num_batch_accumulated
                         norm_loss.backward()
 

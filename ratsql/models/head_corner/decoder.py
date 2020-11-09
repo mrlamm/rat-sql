@@ -16,7 +16,7 @@ from ratsql.models import abstract_preproc
 from ratsql.models import attention
 from ratsql.models import variational_lstm
 from ratsql.models.nl2code.decoder import NL2CodeDecoderPreproc
-# from ratsql.models.head_corner.infer_tree_traversal import InferenceTreeTraversal
+from ratsql.models.head_corner.infer_tree_traversal import InferenceTreeTraversal
 from ratsql.models.head_corner.train_tree_traversal import TrainTreeTraversal
 from ratsql.models.head_corner.tree_traversal import TreeTraversal
 from ratsql.utils import registry
@@ -67,6 +67,9 @@ def get_field_presence_info(ast_wrapper, node, field_infos):
             present.append(is_present and type(field_value).__name__)
         elif maybe_missing and not is_builtin_type:
             present.append(is_present)
+        #elif not maybe_missing and field_info.type in ["table", "column"]:   ## added this condition...
+        #    assert is_present
+        #    present.append(True)
         elif not maybe_missing and is_builtin_type:
             present.append(type(field_value).__name__)
         elif not maybe_missing and not is_builtin_type:
@@ -197,8 +200,8 @@ class HeadCornerDecoder(torch.nn.Module):
                 sorted(self.preproc.seq_lengths.keys()),
                 special_elems=())
 
-        self.all_rules, self.rules_index, self.parent_to_preterminal, self.preterminal_mask, self.preterminal_types, \
-        self.parent_to_hc, self.hc_table, self.parent_to_head, \
+        self.all_rules, self.rules_index, self.parent_to_preterminal, self.preterminal_mask, self.preterminal_debug, \
+        self.preterminal_types, self.parent_to_hc, self.hc_table, self.hc_debug, self.parent_to_head, \
                     self.parent_to_rule = self.compute_rule_masks(grammar_path)
 
 
@@ -266,13 +269,6 @@ class HeadCornerDecoder(torch.nn.Module):
             # TODO: Figure out how to get right sizes (query, value) to module
             self.desc_attn = desc_attn
         self.sup_att = sup_att
-        """
-        self.preterminal_logits = torch.nn.Sequential(
-            torch.nn.Linear(self.recurrent_size, self.rule_emb_size),
-            torch.nn.Tanh(),
-            torch.nn.Linear(self.rule_emb_size, len(self.preterminal_types))
-        )
-        """
         self.rule_logits = torch.nn.Sequential(
             torch.nn.Linear(self.recurrent_size, self.rule_emb_size),
             torch.nn.Tanh(),
@@ -393,6 +389,7 @@ class HeadCornerDecoder(torch.nn.Module):
         # goal to preterminals
         preterminal_map = {}
         preterminal_masks = {}
+        preterminal_debug = {}
         preterminal_types = set()
         with open(path_to_preterminals, 'r') as csv_file:
             elems = csv.reader(csv_file)
@@ -410,6 +407,7 @@ class HeadCornerDecoder(torch.nn.Module):
                 mask_ids = sorted([rules_index[("", p)] for p in prets])
                 preterminal_map[goal] = prets
                 preterminal_masks[goal] = mask_ids
+                preterminal_debug[goal] = set(mask_ids)
 
         # rule to head
         rule_to_head = {}
@@ -456,15 +454,18 @@ class HeadCornerDecoder(torch.nn.Module):
         # now get head corner table -- set of grammar rules available
         # given a head and a goal state
         head_corner_table = {}
+        hc_debug = {}
         for goal_state in preterminal_masks:
             head_corner_table[goal_state] = collections.defaultdict(set)
+            hc_debug[goal_state] = collections.defaultdict(set)
             for head in head_corners[goal_state]:
-                # print(head)
                 for parent, rule in head_to_rule.get(head):
                     if parent in head_corners[goal_state]:
                         head_corner_table[goal_state][head].add(rule)
+                        hc_debug[goal_state][head] = set()
                     elif parent == goal_state:
                         head_corner_table[goal_state][head].add(rule)
+                        hc_debug[goal_state][head] = set()
         # given a rule, get the set of indices in rule vocab corresponding to it
         for key_1 in head_corner_table:
             for key_2 in head_corner_table[key_1]:
@@ -473,9 +474,10 @@ class HeadCornerDecoder(torch.nn.Module):
                     lhs, _ = rule.split(" ->")
                     mask += get_rule_match_indices(lhs, rule, rules_index)
                 head_corner_table[key_1][key_2] = sorted(mask)
+                hc_debug[key_1][key_2] = set(mask)
 
-        return all_rules, rules_index, preterminal_map, preterminal_masks, preterminal_types,\
-            head_corners, head_corner_table, parent_to_head, parent_to_rule
+        return all_rules, rules_index, preterminal_map, preterminal_masks, preterminal_debug, preterminal_types,\
+            head_corners, head_corner_table, hc_debug, parent_to_head, parent_to_rule
 
     def fetch_head_from_node(self, node):
         parent_type = node["_type"]
@@ -502,19 +504,25 @@ class HeadCornerDecoder(torch.nn.Module):
 
             for i, elem in enumerate(node):
                 if i == 0:
-                    ## append agg rule predictor
-                    self.construct_oracle_sequence((None, elem), oracle_sequence, goal_type=goal_type)
+                    if not is_sum_type:
+                        self.construct_oracle_sequence((None, elem), oracle_sequence, goal_type=goal_type)
+                    # new here
+                    else:
+                        self.construct_oracle_sequence((root_type[:-1], elem), oracle_sequence, goal_type=goal_type)
                     # here, check if the parent is a sum type constructor, if so, add an extra expand up
-                    if is_sum_type:
-                        oracle_sequence.append(ExpandUp(rule=(root_type[:-1], elem["_type"]), goal_type=goal_type))
+                    #if is_sum_type:    ### commenting out for now
+                    #    oracle_sequence.append(ExpandUp(rule=(root_type[:-1], elem["_type"]), goal_type=goal_type))
                     rule = get_rule_string_from_node(root_type, node, self.ast_wrapper)
                     oracle_sequence.append(ExpandUp(rule=rule, goal_type=goal_type))
                 else:
-                    self.construct_oracle_sequence((None, elem), oracle_sequence, goal_type=None)
+                    if not is_sum_type:
+                        self.construct_oracle_sequence((None, elem), oracle_sequence, goal_type=None)
+                    else:
+                        self.construct_oracle_sequence((root_type[:-1], elem), oracle_sequence, goal_type=None)
                     # here, check if the parent is a sum type constructor, if so, replace match with ExpandUP, then **MATCH**
-                    if is_sum_type:
-                        oracle_sequence[-1] = ExpandUp(rule=(root_type[:-1], elem["_type"]), goal_type=goal_type)
-                        oracle_sequence.append(ExpandUp(rule="**MATCH**", goal_type=root_type[:-1]))
+                    #if is_sum_type:
+                    #    ## oracle_sequence[-1] = ExpandUp(rule=(root_type[:-1], elem["_type"]), goal_type=goal_type)
+                    #    oracle_sequence.append(ExpandUp(rule="**MATCH**", goal_type=root_type[:-1]))
 
             if goal_was_false:
                 oracle_sequence.append(ExpandUp(rule="**MATCH**", goal_type=goal_type))
@@ -524,7 +532,11 @@ class HeadCornerDecoder(torch.nn.Module):
             node_type = node["_type"]
 
             if len(node) == 1:
-                assert goal_was_false
+                try:
+                    assert goal_was_false
+                except:
+                    print(node)
+                    raise AssertionError
 
                 oracle_sequence.append(PredictPreterminal(ttype=node_type,
                                                           goal_type=root_type))
@@ -590,11 +602,16 @@ class HeadCornerDecoder(torch.nn.Module):
 
         return zip(encoder_data, decoder_data, oracle_sequences)
 
+    def begin_inference(self, desc_enc, example):
+        traversal = InferenceTreeTraversal(self, desc_enc, example)
+        choices = traversal.step(None)
+        return traversal, choices
+
     def compute_loss(self, enc_input, example, desc_enc, debug):
         mle_loss = self.compute_mle_loss(enc_input, example, desc_enc, debug)
 
         if self.use_align_loss:
-            align_loss = self.compute_align_loss(desc_enc, example)
+            align_loss = self.compute_align_loss(desc_enc, example[0])
             return mle_loss + align_loss
         return mle_loss
 
@@ -604,25 +621,38 @@ class HeadCornerDecoder(torch.nn.Module):
         self.operation = self.State.PREDICT_HEAD_CORNER
 
     def compute_mle_loss(self, enc_input, example, desc_enc, debug):
-        ## something weird going on here
+
         _, oracle = example
+
+        # copy this over because pop is destructive
+        oracle = oracle[:]
+
+        #print("##########")
+        #print(json.dumps(example[0].tree, indent=2))
+        #print(oracle)
 
         traversal = TrainTreeTraversal(self, desc_enc)
         traversal.step(None)
         while oracle:
             action = oracle.pop(0)
-
             if isinstance(action, PredictPreterminal):
                 index = self.rules_index[("", action.ttype)]
                 goal_type = action.goal_type
                 assert traversal.current_state == TreeTraversal.State.PRETERMINAL_APPLY
                 assert traversal.goals[-1].node_type == goal_type
+                try:
+                    assert index in self.preterminal_debug[goal_type]
+                except:
+                    # print(action)
+                    raise AssertionError
                 traversal.step(index)
             elif isinstance(action, ExpandUp):
+                hc = traversal.head_corners[-1]
                 if action.rule == "**MATCH**":
                     index = self.rules_index[("", action.rule)]
                 else:
                     index = self.rules_index[action.rule]
+                    assert index in self.hc_debug[hc.goal_type][hc.root_type]
                 traversal.step(index)
             else:  # point
                 assert traversal.current_state in [TreeTraversal.State.POINTER_APPLY,
@@ -635,8 +665,24 @@ class HeadCornerDecoder(torch.nn.Module):
                     for value in field_value_split:
                         traversal.step(value)
                 else:
-                    index = action.value
-                    traversal.step(index)
+                    pointer_map = desc_enc.pointer_maps.get(action.ttype)
+                    value = action.value
+
+                    if pointer_map:
+                        values = pointer_map[value]
+                        traversal.step(values[0], values[1:])
+                    else:
+                        traversal.step(value)
+
+        loss = torch.sum(torch.stack(tuple(traversal.loss), dim=0), dim=0)
+
+        hc = traversal.head_corners[-1]
+        _, converted = traversal.convert_head_corner_to_node_rep(hc)
+
+        # t1 = json.dumps(converted, indent=2, sort_keys=True)
+        # t2 = json.dumps(example[0].tree, indent=2, sort_keys=True)
+
+        return loss
 
     def compute_loss_from_all_ordering(self, enc_input, example, desc_enc, debug):
         def get_permutations(node):
@@ -752,14 +798,23 @@ class HeadCornerDecoder(torch.nn.Module):
 
         return output, new_state, rule_logits
 
-    def rule_infer(self, node_type, rule_logits):
+    def rule_infer(self, node_type, goal_type, rule_logits, state):
         rule_logprobs = torch.nn.functional.log_softmax(rule_logits, dim=-1)
-        rules_start, rules_end = self.preproc.rules_mask[node_type]
 
-        # TODO: Mask other probabilities first?
-        return list(zip(
-            range(rules_start, rules_end),
-            rule_logprobs[0, rules_start:rules_end]))
+        if state == TreeTraversal.State.EXPAND_UP_INQUIRE:
+            assert goal_type
+            rule_ids = self.hc_table[goal_type][node_type]
+            if goal_type == node_type:
+                rule_ids += [self.rules_index[("", "**MATCH**")]]
+                rule_ids = sorted(rule_ids)
+        elif state == TreeTraversal.State.PRETERMINAL_INQUIRE:
+            rule_ids = self.preterminal_mask[node_type]
+        else:
+            print("Rule infer should only be evoked for expand up and predict preterminal.")
+            raise NotImplementedError
+
+        return list(zip(rule_ids, [rule_logprobs[0, idx] for idx in rule_ids]))
+
 
     def gen_token(
             self,

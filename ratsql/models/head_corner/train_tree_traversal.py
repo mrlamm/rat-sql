@@ -58,7 +58,7 @@ class TrainTreeTraversal(TreeTraversal):
         super_clone.history = self.history
         return super_clone
 
-    def rule_choice(self, node_type, rule_logits):
+    def rule_choice(self, node_type, goal_type, rule_logits):
         self.choice_point = self.XentChoicePoint(rule_logits)
         # print('train_tree_traversal.rule_choice')
         # print('setting choicepoint to XentChoicePoint')
@@ -96,8 +96,6 @@ class TrainTreeTraversal(TreeTraversal):
                 self.model.preproc.all_rules[rule_idx][1]
                 for rule_idx in valid_choice_indices]
 
-        # print("train_tree_traversal.update_using_last_choice")
-        # print("computing new loss using last choice")
         self.loss = self.loss.append(
                 self.choice_point.compute_loss(self, last_choice, extra_choice_info))
         

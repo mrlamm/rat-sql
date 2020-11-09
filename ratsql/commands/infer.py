@@ -17,6 +17,7 @@ from ratsql import datasets
 from ratsql import grammars
 # noinspection PyUnresolvedReferences
 from ratsql import models
+from ratsql.models.head_corner.decoder import HeadCornerDecoder
 # noinspection PyUnresolvedReferences
 from ratsql import optimizers
 from ratsql.models.spider import spider_beam_search
@@ -92,13 +93,20 @@ class Inferer:
             output.flush()
 
     def _infer_one(self, model, data_item, preproc_item, beam_size, output_history=False, use_heuristic=True):
-        if use_heuristic:
-            # TODO: from_cond should be true from non-bert model
-            beams = spider_beam_search.beam_search_with_heuristics(
-                model, data_item, preproc_item, beam_size=beam_size, max_steps=1000, from_cond=False)
+
+        if isinstance(model.decoder, HeadCornerDecoder):
+             beams = spider_beam_search.head_corner_beam_search_with_heuristics(model, data_item, preproc_item,
+                                                                                beam_size=beam_size,
+                                                                                max_steps=1000,
+                                                                                from_cond=False)
         else:
-            beams = beam_search.beam_search(
-                model, data_item, preproc_item, beam_size=beam_size, max_steps=1000)
+            if use_heuristic:
+                # TODO: from_cond should be true from non-bert model
+                beams = spider_beam_search.beam_search_with_heuristics(
+                    model, data_item, preproc_item, beam_size=beam_size, max_steps=1000, from_cond=False)
+            else:
+                beams = beam_search.beam_search(
+                    model, data_item, preproc_item, beam_size=beam_size, max_steps=1000)
         decoded = []
         for beam in beams:
             model_output, inferred_code = beam.inference_state.finalize()

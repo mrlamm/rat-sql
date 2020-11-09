@@ -22,7 +22,7 @@ RUN pip install --user -r requirements.txt && \
     python -c "import nltk; nltk.download('stopwords'); nltk.download('punkt')"
 
 # Cache the pretrained BERT model
-RUN python -c "from transformers import BertModel; BertModel.from_pretrained('bert-large-uncased-whole-word-masking')"
+# RUN python -c "from transformers import BertModel; BertModel.from_pretrained('bert-large-uncased-whole-word-masking')"
 
 # Download & cache StanfordNLP
 RUN mkdir -p /app/third_party && \

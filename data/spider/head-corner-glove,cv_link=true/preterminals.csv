@@ -4,7 +4,10 @@ order_by,column
 from,"table, column"
 agg,column
 agg_type,"NoneAggOp, Max, Min, Count, Sum, Avg"
-singleton,
+singleton,singleton
 val,"column, Terminal"
 order,"Asc, Desc"
 table_unit,"table, column"
+val_unit,column
+col_unit*,column
+col_unit,column
