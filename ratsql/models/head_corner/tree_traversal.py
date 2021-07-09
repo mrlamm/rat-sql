@@ -21,6 +21,20 @@ def get_head_of_grammar_rule(named_children, parent_to_head):
 	raise IndexError
 
 
+def convert_primitive(primitive):
+    if isinstance(primitive, int):
+        return primitive
+    elif isinstance(primitive, str):
+        if primitive == 'False':
+            return False
+        elif primitive == 'True':
+            return True
+        else:
+            print("The terminal value " + primitive + " is unaccounted for in hc converter.")
+            raise NotImplementedError
+    else:
+        raise NotImplementedError
+
 class TreeTraversal:
     class Handler:
         handlers = {}
@@ -407,7 +421,7 @@ class TreeTraversal:
                 self.head_corners = self.head_corners.set(-1, new_root)
 
                 for i in reversed(range(len(children))):
-                    if i != head_index:
+                    if i != head_index:     # all the newly created children that need children of their own
                         goal = TreeTraversal.GoalItem(node_type=children[i].root_type,
                                                       siblings=children,
                                                       position=i,
@@ -455,7 +469,6 @@ class TreeTraversal:
                                                       prec_action_emb=self.prev_action_emb,
                                                       prec_h=head_corner.prec_h,
                                                       goal_h=head_corner.goal_h,
-                                                      name=children[i].name,
                                                       preterminal_done=False)
 
                         self.goals = self.goals.append(goal)
@@ -478,3 +491,22 @@ class TreeTraversal:
 
     def pointer_choice(self, node_type, logits, attention_logits):
         raise NotImplementedError
+
+    def convert_head_corner_to_node_rep(self, hc):
+        if isinstance(hc, TreeTraversal.TerminalItem):
+            return convert_primitive(hc.value)
+        else:
+            node_type = hc.root_type
+            if node_type.endswith('*'):
+                return [self.convert_head_corner_to_node_rep(child) for child in hc.children]
+            elif node_type in self.model.ast_wrapper.sum_types:
+                return self.convert_head_corner_to_node_rep(hc.children[0])
+            elif node_type in self.model.ast_wrapper.primitive_types:
+                return self.convert_head_corner_to_node_rep(hc.children[0])
+            else:
+                contribution = {"_type": node_type}
+                for child in hc.children:
+                    name = child.name
+                    contribution.update({name: self.convert_head_corner_to_node_rep(child)})
+                return contribution
+

@@ -58,7 +58,8 @@ class TrainTreeTraversal(TreeTraversal):
         super_clone.history = self.history
         return super_clone
 
-    def rule_choice(self, node_type, goal_type, rule_logits):
+    # def rule_choice(self, node_type, goal_type, rule_logits):    ## not sure how goal type made its way into this
+    def rule_choice(self, node_type, rule_logits):
         self.choice_point = self.XentChoicePoint(rule_logits)
         # print('train_tree_traversal.rule_choice')
         # print('setting choicepoint to XentChoicePoint')
@@ -66,6 +67,7 @@ class TrainTreeTraversal(TreeTraversal):
             choices = []
             probs = []
             for rule_idx, logprob in sorted(
+                    # made change here
                     self.model.rule_infer(node_type, rule_logits),
                     key=operator.itemgetter(1),
                     reverse=True):
@@ -82,7 +84,6 @@ class TrainTreeTraversal(TreeTraversal):
     def pointer_choice(self, node_type, logits, attention_logits):
         self.choice_point = self.XentChoicePoint(logits)
         self.attention_choice = self.XentChoicePoint(attention_logits)
-        # print('setting choicepoint to XentChoicePoint')
 
     def update_using_last_choice(self, last_choice, extra_choice_info, attention_offset):
         super().update_using_last_choice(last_choice, extra_choice_info, attention_offset)

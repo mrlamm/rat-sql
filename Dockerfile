@@ -42,6 +42,8 @@ RUN mkdir -p /mnt/data && \
     ln -snf /mnt/data/wikisql wikisql
 
 # Convert all shell scripts to Unix line endings, if any
-RUN /bin/bash -c 'if compgen -G "/app/**/*.sh" > /dev/null; then dos2unix /app/**/*.sh; fi' 
+RUN /bin/bash -c 'if compgen -G "/app/**/*.sh" > /dev/null; then dos2unix /app/**/*.sh; fi'
+
+ENV PYTHONPATH="/app/third_party/wikisql/:${PYTHONPATH}"
 
 ENTRYPOINT bash

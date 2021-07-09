@@ -652,7 +652,8 @@ class HeadCornerDecoder(torch.nn.Module):
                     index = self.rules_index[("", action.rule)]
                 else:
                     index = self.rules_index[action.rule]
-                    assert index in self.hc_debug[hc.goal_type][hc.root_type]
+                    # made change here this could be made stricter by giving head corner items goal types
+                    assert index in self.hc_debug[traversal.goals[-1].node_type][hc.root_type]
                 traversal.step(index)
             else:  # point
                 assert traversal.current_state in [TreeTraversal.State.POINTER_APPLY,
@@ -677,10 +678,14 @@ class HeadCornerDecoder(torch.nn.Module):
         loss = torch.sum(torch.stack(tuple(traversal.loss), dim=0), dim=0)
 
         hc = traversal.head_corners[-1]
-        _, converted = traversal.convert_head_corner_to_node_rep(hc)
+        converted = traversal.convert_head_corner_to_node_rep(hc)
 
-        # t1 = json.dumps(converted, indent=2, sort_keys=True)
-        # t2 = json.dumps(example[0].tree, indent=2, sort_keys=True)
+        t1 = json.dumps(converted, indent=2, sort_keys=True)
+        t2 = json.dumps(example[0].tree, indent=2, sort_keys=True)
+
+        # print(t1)
+        # print(t2)
+        assert t1 == t2
 
         return loss
 
